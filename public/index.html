@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>車の予約</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🚗 車の予約</h1>
+    <div class="me">
+      <label for="me-select">わたしは：</label>
+      <select id="me-select"></select>
+      <button id="edit-names" class="link">名前を変更</button>
+    </div>
+  </header>
+
+  <nav class="weeknav">
+    <button id="prev-week">◀ 前の週</button>
+    <span id="week-label"></span>
+    <button id="next-week">次の週 ▶</button>
+    <button id="this-week" class="link">今週へ</button>
+  </nav>
+
+  <main id="week-grid"></main>
+
+  <p id="hint">空いている日をタップすると、<strong>自分の名前で予約</strong>されます。自分の予約をもう一度タップすると取消できます。</p>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- 名前変更ダイアログ -->
+  <dialog id="names-dialog">
+    <h2>メンバーの名前</h2>
+    <div id="names-form"></div>
+    <menu>
+      <button id="names-close">閉じる</button>
+    </menu>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
