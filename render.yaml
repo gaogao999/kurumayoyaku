@@ -1,0 +1,16 @@
+# Render（https://render.com）用のデプロイ設定。
+# このリポジトリを連携して「Blueprint」から作成すると、この内容で公開されます。
+services:
+  - type: web
+    name: kurumayoyaku
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: DB_PATH
+        value: /data/kurumayoyaku.db
+    disk:
+      # SQLiteのデータが消えないように永続ディスクを割り当てる
+      name: data
+      mountPath: /data
+      sizeGB: 1

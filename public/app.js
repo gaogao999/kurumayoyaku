@@ -107,6 +107,12 @@ async function renderWeek() {
       badge.style.background = r.user_color;
       badge.textContent = r.user_name;
       status.appendChild(badge);
+      if (r.note) {
+        const note = document.createElement('span');
+        note.className = 'note';
+        note.textContent = r.note;
+        status.appendChild(note);
+      }
     } else {
       status.classList.add('empty');
       status.textContent = '空き';
@@ -121,27 +127,57 @@ async function renderWeek() {
 // ---- 操作 ------------------------------------------------------------------
 async function onDayClick(dateStr, reservation) {
   if (!meId) return toast('先に「わたしは」を選んでください');
-  try {
-    if (!reservation) {
+  if (!reservation) {
+    // 空き → その場で予約
+    try {
       await api('/api/reservations', {
         method: 'POST',
         body: JSON.stringify({ date: dateStr, user_id: meId }),
       });
       toast('予約しました');
-    } else if (reservation.user_id === meId) {
+    } catch (e) {
+      toast(e.message);
+    }
+    await renderWeek();
+  } else if (reservation.user_id === meId) {
+    // 自分の予約 → メモ編集 / 取消ダイアログ
+    openResDialog(dateStr, reservation);
+  } else {
+    toast(`その日は ${reservation.user_name} さんが予約済みです`);
+  }
+}
+
+// ---- 自分の予約の操作ダイアログ -------------------------------------------
+function openResDialog(dateStr, reservation) {
+  const dlg = $('#res-dialog');
+  const [, m, d] = dateStr.split('-');
+  $('#res-title').textContent = `${Number(m)}/${Number(d)} の予約`;
+  const noteInput = $('#res-note');
+  noteInput.value = reservation.note || '';
+
+  $('#res-save').onclick = async () => {
+    try {
+      await api('/api/reservations', {
+        method: 'PATCH',
+        body: JSON.stringify({ date: dateStr, user_id: meId, note: noteInput.value }),
+      });
+      toast('保存しました');
+      dlg.close();
+      await renderWeek();
+    } catch (e) { toast(e.message); }
+  };
+  $('#res-cancel').onclick = async () => {
+    try {
       await api('/api/reservations', {
         method: 'DELETE',
         body: JSON.stringify({ date: dateStr, user_id: meId }),
       });
       toast('予約を取消しました');
-    } else {
-      return toast(`その日は ${reservation.user_name} さんが予約済みです`);
-    }
-    await renderWeek();
-  } catch (e) {
-    toast(e.message);
-    await renderWeek();
-  }
+      dlg.close();
+      await renderWeek();
+    } catch (e) { toast(e.message); }
+  };
+  dlg.showModal();
 }
 
 // ---- 名前変更ダイアログ ----------------------------------------------------
@@ -200,6 +236,7 @@ function bindEvents() {
   $('#this-week').addEventListener('click', () => { weekOffset = 0; renderWeek(); });
   $('#edit-names').addEventListener('click', openNamesDialog);
   $('#names-close').addEventListener('click', () => $('#names-dialog').close());
+  $('#res-close').addEventListener('click', () => $('#res-dialog').close());
 }
 
 (async function init() {

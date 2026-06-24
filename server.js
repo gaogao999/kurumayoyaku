@@ -88,6 +88,28 @@ app.delete('/api/reservations', (req, res) => {
   res.json({ ok: true });
 });
 
+// 予約メモの編集（編集できるのは予約した本人のみ）
+app.patch('/api/reservations', (req, res) => {
+  const { date, user_id, note } = req.body;
+  if (!isDate(date)) return res.status(400).json({ error: '日付が正しくありません' });
+
+  const row = db.prepare('SELECT * FROM reservations WHERE date = ?').get(date);
+  if (!row) return res.status(404).json({ error: 'その日の予約はありません' });
+  if (row.user_id !== Number(user_id)) {
+    return res.status(403).json({ error: 'メモを編集できるのは予約した本人だけです' });
+  }
+  db.prepare('UPDATE reservations SET note = ? WHERE date = ?')
+    .run((note ?? '').toString().slice(0, 100), date);
+
+  res.json(db.prepare(`
+    SELECT r.id, r.date, r.user_id, r.note, u.name AS user_name, u.color AS user_color
+    FROM reservations r JOIN users u ON u.id = r.user_id WHERE r.date = ?
+  `).get(date));
+});
+
+// ヘルスチェック（ホスティング用）
+app.get('/healthz', (req, res) => res.json({ ok: true }));
+
 app.listen(PORT, () => {
   console.log(`車予約システム: http://localhost:${PORT}`);
 });
