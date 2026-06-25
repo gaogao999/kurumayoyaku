@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SOPファイル管理システム</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>📋 SOPファイル管理システム</h1>
+      <div class="user-box">
+        <span id="me"></span>
+        <form method="post" action="/logout" class="inline">
+          <button class="ghost" type="submit">ログアウト</button>
+        </form>
+      </div>
+    </header>
+
+    <div class="layout">
+      <!-- サイドバー: カテゴリ -->
+      <aside class="sidebar">
+        <h2>カテゴリ</h2>
+        <ul id="categoryList" class="category-list"></ul>
+
+        <form id="categoryForm" class="add-category">
+          <input type="text" id="newCategory" placeholder="新しいカテゴリ" maxlength="50" />
+          <button type="submit">追加</button>
+        </form>
+      </aside>
+
+      <main class="content">
+        <!-- 検索バー -->
+        <section class="searchbar">
+          <input type="search" id="search" placeholder="🔍 タイトル・説明・ファイル名で検索" />
+          <button id="uploadOpen" class="primary">＋ アップロード</button>
+        </section>
+
+        <!-- ファイル一覧 -->
+        <section>
+          <p id="listInfo" class="list-info"></p>
+          <table class="file-table">
+            <thead>
+              <tr>
+                <th>種類</th>
+                <th>タイトル</th>
+                <th>カテゴリ</th>
+                <th>サイズ</th>
+                <th>登録日時</th>
+                <th>登録者</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="fileRows"></tbody>
+          </table>
+        </section>
+      </main>
+    </div>
+
+    <!-- アップロード用モーダル -->
+    <dialog id="uploadDialog">
+      <form id="uploadForm" method="dialog">
+        <h2>SOPファイルのアップロード</h2>
+        <label>
+          ファイル（PDF / Excel / Word）
+          <input type="file" id="file" name="file" accept=".pdf,.xls,.xlsx,.doc,.docx" required />
+        </label>
+        <label>
+          タイトル
+          <input type="text" id="title" name="title" placeholder="未入力ならファイル名を使用" maxlength="200" />
+        </label>
+        <label>
+          カテゴリ
+          <select id="uploadCategory" name="category_id"></select>
+        </label>
+        <label>
+          説明（任意）
+          <textarea id="description" name="description" rows="3" maxlength="1000"></textarea>
+        </label>
+        <p id="uploadError" class="error" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" id="uploadCancel" class="ghost">キャンセル</button>
+          <button type="submit" class="primary">アップロード</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/assets/app.js"></script>
+  </body>
+</html>
