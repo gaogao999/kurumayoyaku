@@ -1,7 +1,7 @@
 {
   "name": "sop-system",
   "version": "1.0.0",
-  "description": "SOP（標準作業手順書）ファイル管理システム — アップロード／カテゴリ別管理／検索／ダウンロード",
+  "description": "SOP (Standard Operating Procedure) file management system — upload, categorize, search and download",
   "type": "module",
   "main": "server.js",
   "scripts": {

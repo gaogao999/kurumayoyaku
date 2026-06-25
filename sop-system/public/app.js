@@ -3,7 +3,7 @@
 const $ = (sel) => document.querySelector(sel);
 const state = { categories: [], activeCategory: 'all', q: '' };
 
-// --- ユーティリティ --------------------------------------------------------
+// --- Utilities -------------------------------------------------------------
 const fmtSize = (n) => {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
@@ -33,11 +33,11 @@ async function api(path, opts) {
     throw new Error('unauthorized');
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `エラー (${res.status})`);
+  if (!res.ok) throw new Error(data.error || `Error (${res.status})`);
   return data;
 }
 
-// --- カテゴリ ---------------------------------------------------------------
+// --- Categories ------------------------------------------------------------
 async function loadCategories() {
   state.categories = await api('/api/categories');
   renderCategories();
@@ -48,16 +48,16 @@ function renderCategories() {
   const ul = $('#categoryList');
   const total = state.categories.reduce((s, c) => s + c.file_count, 0);
   const items = [
-    { id: 'all', name: 'すべて', file_count: total, fixed: true },
+    { id: 'all', name: 'All', file_count: total, fixed: true },
     ...state.categories,
-    { id: 'none', name: '未分類', file_count: -1, fixed: true },
+    { id: 'none', name: 'Uncategorized', file_count: -1, fixed: true },
   ];
   ul.innerHTML = items
     .map((c) => {
       const active = String(state.activeCategory) === String(c.id) ? ' active' : '';
       const count = c.file_count >= 0 ? `<span class="count">${c.file_count}</span>` : '';
       const del =
-        c.fixed ? '' : `<button class="del-cat" data-id="${c.id}" title="削除">×</button>`;
+        c.fixed ? '' : `<button class="del-cat" data-id="${c.id}" title="Delete">×</button>`;
       return `<li class="cat-item${active}" data-id="${c.id}">
         <span class="cat-name">${esc(c.name)}</span>${count}${del}</li>`;
     })
@@ -66,11 +66,11 @@ function renderCategories() {
 
 function renderCategoryOptions() {
   $('#uploadCategory').innerHTML =
-    '<option value="">未分類</option>' +
+    '<option value="">Uncategorized</option>' +
     state.categories.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
 }
 
-// --- ファイル一覧 -----------------------------------------------------------
+// --- File list -------------------------------------------------------------
 async function loadFiles() {
   const params = new URLSearchParams();
   if (state.q) params.set('q', state.q);
@@ -80,10 +80,10 @@ async function loadFiles() {
 }
 
 function renderFiles(files) {
-  $('#listInfo').textContent = `${files.length} 件のファイル`;
+  $('#listInfo').textContent = `${files.length} file${files.length === 1 ? '' : 's'}`;
   const tbody = $('#fileRows');
   if (files.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty">該当するファイルがありません</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">No matching files</td></tr>`;
     return;
   }
   tbody.innerHTML = files
@@ -95,27 +95,27 @@ function renderFiles(files) {
           ${f.description ? `<div class="file-desc">${esc(f.description)}</div>` : ''}
           <div class="file-orig">${esc(f.original_name)}</div>
         </td>
-        <td>${f.category_name ? esc(f.category_name) : '<span class="muted">未分類</span>'}</td>
+        <td>${f.category_name ? esc(f.category_name) : '<span class="muted">Uncategorized</span>'}</td>
         <td>${fmtSize(f.size)}</td>
         <td>${fmtDate(f.uploaded_at)}</td>
         <td>${esc(f.uploaded_by_name || '-')}</td>
         <td class="actions">
-          <a class="btn-link" href="/api/files/${f.id}/download">⬇ DL</a>
-          <button class="btn-link danger del-file" data-id="${f.id}">削除</button>
+          <a class="btn-link" href="/api/files/${f.id}/download">⬇ Download</a>
+          <button class="btn-link danger del-file" data-id="${f.id}">Delete</button>
         </td>
       </tr>`
     )
     .join('');
 }
 
-// --- イベント ---------------------------------------------------------------
+// --- Events ----------------------------------------------------------------
 function bindEvents() {
-  // カテゴリ選択・削除（委譲）
+  // Select / delete category (delegated)
   $('#categoryList').addEventListener('click', async (e) => {
     const del = e.target.closest('.del-cat');
     if (del) {
       e.stopPropagation();
-      if (!confirm('このカテゴリを削除しますか？（中のファイルは「未分類」になります）')) return;
+      if (!confirm('Delete this category? Files in it will become Uncategorized.')) return;
       await api(`/api/categories/${del.dataset.id}`, { method: 'DELETE' });
       if (String(state.activeCategory) === del.dataset.id) state.activeCategory = 'all';
       await loadCategories();
@@ -130,7 +130,7 @@ function bindEvents() {
     }
   });
 
-  // カテゴリ追加
+  // Add category
   $('#categoryForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = $('#newCategory').value.trim();
@@ -148,7 +148,7 @@ function bindEvents() {
     }
   });
 
-  // 検索（入力のたびに）
+  // Search (as you type)
   let timer;
   $('#search').addEventListener('input', (e) => {
     clearTimeout(timer);
@@ -156,22 +156,22 @@ function bindEvents() {
     timer = setTimeout(loadFiles, 250);
   });
 
-  // ファイル削除（委譲）
+  // Delete file (delegated)
   $('#fileRows').addEventListener('click', async (e) => {
     const del = e.target.closest('.del-file');
     if (!del) return;
-    if (!confirm('このファイルを削除しますか？')) return;
+    if (!confirm('Delete this file?')) return;
     await api(`/api/files/${del.dataset.id}`, { method: 'DELETE' });
     await loadFiles();
     await loadCategories();
   });
 
-  // アップロードモーダル
+  // Upload modal
   const dialog = $('#uploadDialog');
   $('#uploadOpen').addEventListener('click', () => {
     $('#uploadForm').reset();
     $('#uploadError').hidden = true;
-    // 現在のカテゴリを初期選択
+    // Preselect the currently active category
     if (state.activeCategory !== 'all' && state.activeCategory !== 'none') {
       $('#uploadCategory').value = state.activeCategory;
     }
@@ -201,13 +201,13 @@ function bindEvents() {
   });
 }
 
-// --- 起動 -------------------------------------------------------------------
+// --- Bootstrap --------------------------------------------------------------
 async function init() {
   try {
     const { user } = await api('/api/me');
-    $('#me').textContent = `${user.display_name || user.username} さん`;
+    $('#me').textContent = user.display_name || user.username;
   } catch {
-    return; // api() が 401 でリダイレクト済み
+    return; // api() already redirected on 401
   }
   bindEvents();
   await loadCategories();

@@ -17,7 +17,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// --- セッション（クッキー名: connect.sid） ---------------------------------
+// --- Session (cookie name: connect.sid) ------------------------------------
 app.use(
   session({
     name: 'connect.sid',
@@ -27,7 +27,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: 'lax',
-      maxAge: 1000 * 60 * 60 * 8, // 8時間
+      maxAge: 1000 * 60 * 60 * 8, // 8 hours
       secure: process.env.NODE_ENV === 'production' && process.env.TRUST_PROXY === '1',
     },
   })
@@ -35,7 +35,7 @@ app.use(
 
 if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
 
-// --- アップロード設定（PDF / Excel / Word のみ許可） -------------------------
+// --- Upload config (PDF / Excel / Word only) -------------------------------
 const ALLOWED = {
   'application/pdf': ['.pdf'],
   'application/vnd.ms-excel': ['.xls'],
@@ -58,27 +58,27 @@ const upload = multer({
     if (ALLOWED_EXT.has(ext) && (okMime || file.mimetype === 'application/octet-stream')) {
       return cb(null, true);
     }
-    cb(new Error('PDF / Excel / Word ファイルのみアップロードできます'));
+    cb(new Error('Only PDF, Excel or Word files can be uploaded'));
   },
 });
 
-// --- 認証ミドルウェア -------------------------------------------------------
+// --- Auth middleware -------------------------------------------------------
 const requireAuth = (req, res, next) => {
   if (req.session && req.session.user) return next();
-  // API は 401、画面はログインへ
-  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'ログインが必要です' });
+  // API -> 401, pages -> sign-in
+  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Sign in required' });
   res.redirect('/login.html');
 };
 
-// --- 認証 -------------------------------------------------------------------
-// ログイン: POST /checklogin（username, password を form 送信）
+// --- Auth ------------------------------------------------------------------
+// Sign in: POST /checklogin (username, password sent as a form)
 app.post('/checklogin', (req, res) => {
   const { username, password } = req.body;
   const wantsJson = (req.get('accept') || '').includes('application/json');
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get((username || '').toString().trim());
 
   if (!user || !bcrypt.compareSync((password || '').toString(), user.password_hash)) {
-    if (wantsJson) return res.status(401).json({ error: 'ユーザー名またはパスワードが違います' });
+    if (wantsJson) return res.status(401).json({ error: 'Incorrect username or password' });
     return res.redirect('/login.html?error=1');
   }
 
@@ -97,15 +97,15 @@ app.post('/logout', (req, res) => {
 
 app.get('/api/me', requireAuth, (req, res) => res.json({ user: req.session.user }));
 
-// --- 静的ファイル ----------------------------------------------------------
-// ログインページと静的アセットは認証なしで配信
+// --- Static files ----------------------------------------------------------
+// The sign-in page and static assets are served without auth
 app.get('/login.html', (req, res) => res.sendFile(join(__dirname, 'public', 'login.html')));
 app.use('/assets', express.static(join(__dirname, 'public')));
 
-// トップは認証必須（未ログインならログインへ）
+// The home page requires auth (redirects to sign-in if not logged in)
 app.get('/', requireAuth, (req, res) => res.sendFile(join(__dirname, 'public', 'index.html')));
 
-// --- カテゴリ API -----------------------------------------------------------
+// --- Category API ----------------------------------------------------------
 app.get('/api/categories', requireAuth, (req, res) => {
   const rows = db
     .prepare(
@@ -120,9 +120,9 @@ app.get('/api/categories', requireAuth, (req, res) => {
 
 app.post('/api/categories', requireAuth, (req, res) => {
   const name = (req.body.name || '').toString().trim().slice(0, 50);
-  if (!name) return res.status(400).json({ error: 'カテゴリ名を入力してください' });
+  if (!name) return res.status(400).json({ error: 'Please enter a category name' });
   const exists = db.prepare('SELECT id FROM categories WHERE name = ?').get(name);
-  if (exists) return res.status(409).json({ error: '同じ名前のカテゴリが既にあります' });
+  if (exists) return res.status(409).json({ error: 'A category with that name already exists' });
   const info = db.prepare('INSERT INTO categories (name) VALUES (?)').run(name);
   res.status(201).json({ id: info.lastInsertRowid, name, file_count: 0 });
 });
@@ -130,13 +130,13 @@ app.post('/api/categories', requireAuth, (req, res) => {
 app.delete('/api/categories/:id', requireAuth, (req, res) => {
   const id = Number(req.params.id);
   const cat = db.prepare('SELECT id FROM categories WHERE id = ?').get(id);
-  if (!cat) return res.status(404).json({ error: 'カテゴリが見つかりません' });
-  // 紐づくファイルは「未分類」（category_id = NULL）になる（ON DELETE SET NULL）
+  if (!cat) return res.status(404).json({ error: 'Category not found' });
+  // Linked files become uncategorized (category_id = NULL) via ON DELETE SET NULL
   db.prepare('DELETE FROM categories WHERE id = ?').run(id);
   res.json({ ok: true });
 });
 
-// --- ファイル API -----------------------------------------------------------
+// --- File API --------------------------------------------------------------
 const fileSelect = `
   SELECT f.id, f.title, f.description, f.category_id, c.name AS category_name,
          f.original_name, f.mimetype, f.size, f.uploaded_at,
@@ -146,7 +146,7 @@ const fileSelect = `
   LEFT JOIN users u ON u.id = f.uploaded_by
 `;
 
-// 一覧 + 検索（q: タイトル/説明/元ファイル名, category: カテゴリID）
+// List + search (q: title/description/original name, category: category id)
 app.get('/api/files', requireAuth, (req, res) => {
   const q = (req.query.q || '').toString().trim();
   const category = req.query.category;
@@ -169,11 +169,11 @@ app.get('/api/files', requireAuth, (req, res) => {
   res.json(db.prepare(sql).all(...params));
 });
 
-// アップロード
+// Upload
 app.post('/api/files', requireAuth, (req, res) => {
   upload.single('file')(req, res, (err) => {
     if (err) return res.status(400).json({ error: err.message });
-    if (!req.file) return res.status(400).json({ error: 'ファイルを選択してください' });
+    if (!req.file) return res.status(400).json({ error: 'Please choose a file' });
 
     const title = (req.body.title || req.file.originalname).toString().trim().slice(0, 200);
     const description = (req.body.description || '').toString().trim().slice(0, 1000);
@@ -204,12 +204,12 @@ app.post('/api/files', requireAuth, (req, res) => {
   });
 });
 
-// ダウンロード
+// Download
 app.get('/api/files/:id/download', requireAuth, (req, res) => {
   const row = db.prepare('SELECT * FROM sop_files WHERE id = ?').get(Number(req.params.id));
-  if (!row) return res.status(404).json({ error: 'ファイルが見つかりません' });
+  if (!row) return res.status(404).json({ error: 'File not found' });
   const path = join(UPLOAD_DIR, row.stored_name);
-  if (!existsSync(path)) return res.status(410).json({ error: '実ファイルが存在しません' });
+  if (!existsSync(path)) return res.status(410).json({ error: 'The stored file no longer exists' });
 
   res.setHeader('Content-Type', row.mimetype || 'application/octet-stream');
   res.setHeader(
@@ -219,23 +219,23 @@ app.get('/api/files/:id/download', requireAuth, (req, res) => {
   createReadStream(path).pipe(res);
 });
 
-// 削除
+// Delete
 app.delete('/api/files/:id', requireAuth, (req, res) => {
   const row = db.prepare('SELECT * FROM sop_files WHERE id = ?').get(Number(req.params.id));
-  if (!row) return res.status(404).json({ error: 'ファイルが見つかりません' });
+  if (!row) return res.status(404).json({ error: 'File not found' });
   db.prepare('DELETE FROM sop_files WHERE id = ?').run(row.id);
   const path = join(UPLOAD_DIR, row.stored_name);
   try {
     if (existsSync(path)) unlinkSync(path);
   } catch {
-    /* 実ファイル削除に失敗してもDBは消えている。ログのみ */
+    /* The DB row is already gone even if file removal fails; ignore */
   }
   res.json({ ok: true });
 });
 
-// ヘルスチェック
+// Health check
 app.get('/healthz', (req, res) => res.json({ ok: true }));
 
 app.listen(PORT, () => {
-  console.log(`SOPファイル管理システム: http://localhost:${PORT}`);
+  console.log(`SOP File Management System: http://localhost:${PORT}`);
 });
