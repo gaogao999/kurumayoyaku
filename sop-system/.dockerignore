@@ -1,0 +1,10 @@
+node_modules
+data
+uploads
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.git
+.env
+.DS_Store

@@ -17,7 +17,7 @@ A web app for managing **SOP (Standard Operating Procedure)** documents in **PDF
 | Layer | Technology |
 |-------|-----------|
 | Server | Node.js + Express |
-| Session | express-session (cookie name `connect.sid`) |
+| Session | express-session + SQLite store (cookie name `connect.sid`, survives restarts) |
 | Auth | bcryptjs password hashing |
 | Upload | multer (validates extension + MIME type) |
 | Database | SQLite (better-sqlite3) |
@@ -86,6 +86,40 @@ node seed.js <username> <password> "Display Name"
 | GET | `/healthz` | Health check |
 
 `/api/*` returns `401` when not signed in. `/` redirects to the sign-in page when not signed in.
+
+## Deployment
+
+The app is containerized (`Dockerfile`) and the DB + uploads live on a persistent
+disk mounted at `/data`, so data and logins survive restarts.
+
+### Render (free tier, public URL)
+
+**Option A — Dashboard (recommended):**
+1. Sign in to https://render.com with GitHub.
+2. **New → Web Service**, select this repository.
+3. Set **Root Directory** to `sop-system` and **Runtime** to `Docker`.
+4. Add a **Disk**: mount path `/data`, size 1 GB.
+5. Add environment variables: `ADMIN_USER`, `ADMIN_PASS`, and a long random
+   `SESSION_SECRET` (Render can generate one). `DB_PATH` / `UPLOAD_DIR` are
+   already baked into the Dockerfile.
+6. Deploy — Render gives you a public `https://…onrender.com` URL.
+
+**Option B — Blueprint:** copy `sop-system/render.yaml` to the repository root,
+then **New → Blueprint** and select this repo. It provisions the service, disk
+and env vars automatically (you'll be asked for `ADMIN_USER` / `ADMIN_PASS`).
+
+### Docker (anywhere)
+
+```bash
+cd sop-system
+docker build -t sop-system .
+docker run -p 3000:3000 -v $(pwd)/data:/data \
+  -e SESSION_SECRET=long-random-string -e ADMIN_USER=you -e ADMIN_PASS=secret \
+  sop-system
+```
+
+> When public, anyone with the URL reaches the sign-in page. Always set a strong
+> `ADMIN_PASS` and `SESSION_SECRET`.
 
 ## Security notes
 

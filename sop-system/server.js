@@ -1,5 +1,6 @@
 import express from 'express';
 import session from 'express-session';
+import SqliteStoreFactory from 'better-sqlite3-session-store';
 import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import { fileURLToPath } from 'node:url';
@@ -18,10 +19,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // --- Session (cookie name: connect.sid) ------------------------------------
+// Sessions are stored in SQLite so logins survive restarts (e.g. free-tier sleep)
+const SqliteStore = SqliteStoreFactory(session);
 app.use(
   session({
     name: 'connect.sid',
     secret: process.env.SESSION_SECRET || 'sop-system-dev-secret-change-me',
+    store: new SqliteStore({
+      client: db,
+      expired: { clear: true, intervalMs: 1000 * 60 * 60 }, // hourly cleanup
+    }),
     resave: false,
     saveUninitialized: false,
     cookie: {
