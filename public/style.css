@@ -26,7 +26,6 @@ header {
   top: 0;
   z-index: 5;
 }
-
 header h1 { margin: 0 0 10px; font-size: 1.25rem; }
 
 .me { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -61,48 +60,53 @@ button.link { border: none; background: none; color: var(--accent); padding: 6px
 
 main#week-grid {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   padding: 0 16px 24px;
   max-width: 720px;
   margin: 0 auto;
 }
 
 .day {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 12px;
-  cursor: pointer;
-  transition: background 0.12s;
+  overflow: hidden;
 }
-.day:hover { background: #fafbfc; }
 .day.today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.day.past { opacity: 0.5; }
+.day.past { opacity: 0.6; }
 
-.day .dow {
-  font-size: 1.1rem;
-  font-weight: 700;
-  width: 2.4em;
-  text-align: center;
+.day-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #fafbfc;
 }
-.day .date { color: var(--muted); font-size: 0.85rem; width: 5em; }
-.day.sat .dow { color: #2a6fd0; }
+.day-head .dow { font-size: 1.1rem; font-weight: 700; }
+.day.sat .day-head .dow { color: #2a6fd0; }
+.day-head .date { color: var(--muted); font-size: 0.9rem; }
+.day-head .add { margin-left: auto; color: var(--accent); border-color: #cfe0ff; padding: 6px 12px; }
 
-.day .status { flex: 1; text-align: right; font-weight: 600; }
-.day .status.empty { color: var(--muted); font-weight: 400; }
-.day .note { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+.day-body { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+.day-body .empty { color: var(--muted); font-size: 0.9rem; padding: 4px 0; }
 
-.badge {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 999px;
-  color: #fff;
-  font-size: 0.95rem;
+.res {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--muted);
+  border-radius: 8px;
+  background: #fff;
 }
-.badge.mine { box-shadow: 0 0 0 2px #2b2f36 inset; }
+.res.mine { cursor: pointer; background: #fbfdff; }
+.res .time { font-weight: 700; font-variant-numeric: tabular-nums; }
+.res .who { font-weight: 600; font-size: 0.92rem; }
+.res .note { color: var(--muted); font-size: 0.85rem; }
+.res .edit { margin-left: auto; color: var(--accent); font-size: 0.85rem; }
 
 .toast {
   position: fixed;
@@ -115,6 +119,8 @@ main#week-grid {
   border-radius: 999px;
   font-size: 0.95rem;
   z-index: 20;
+  max-width: 90vw;
+  text-align: center;
   box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
 
@@ -126,14 +132,21 @@ dialog {
 }
 dialog::backdrop { background: rgba(0,0,0,0.35); }
 dialog h2 { margin: 0 0 14px; font-size: 1.1rem; }
+
+.field { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.field label { width: 3em; color: var(--muted); font-size: 0.9rem; }
+.field select, .field input[type="text"] {
+  flex: 1; font-size: 1rem; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 8px; background: #fff;
+}
+
 .name-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .name-row input[type="text"] {
   flex: 1; font-size: 1rem; padding: 8px 10px;
   border: 1px solid var(--line); border-radius: 8px;
 }
-.name-row input[type="color"] {
-  width: 38px; height: 38px; border: none; background: none; padding: 0;
-}
+.name-row input[type="color"] { width: 38px; height: 38px; border: none; background: none; padding: 0; }
+
 dialog menu { display: flex; justify-content: flex-end; padding: 0; margin: 8px 0 0; }
 dialog menu.res-menu { align-items: center; gap: 8px; }
 button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }

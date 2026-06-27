@@ -1,6 +1,20 @@
 'use strict';
 
 const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+const OPEN = '08:00';
+const CLOSE = '22:00';
+
+// ---- 時刻スロット（8:00〜22:00 を30分きざみ） -----------------------------
+function buildSlots() {
+  const slots = [];
+  for (let m = 8 * 60; m <= 22 * 60; m += 30) {
+    const h = String(Math.floor(m / 60)).padStart(2, '0');
+    const mi = String(m % 60).padStart(2, '0');
+    slots.push(`${h}:${mi}`);
+  }
+  return slots; // ['08:00', ..., '22:00']
+}
+const SLOTS = buildSlots();
 
 // ---- 日付ユーティリティ（ローカル時刻ベース） -----------------------------
 function ymd(d) {
@@ -14,17 +28,16 @@ function addDays(d, n) {
   r.setDate(r.getDate() + n);
   return r;
 }
-// その日を含む週の月曜日を返す
 function mondayOf(d) {
   const r = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const dow = r.getDay();            // 0=日,1=月,...
+  const dow = r.getDay();
   const diff = dow === 0 ? -6 : 1 - dow;
   return addDays(r, diff);
 }
 
 // ---- 状態 ------------------------------------------------------------------
 let users = [];
-let weekOffset = 0;                  // 0=今週, +1=来週 ...
+let weekOffset = 0;
 let meId = Number(localStorage.getItem('kurumayoyaku.meId')) || null;
 
 const $ = (sel) => document.querySelector(sel);
@@ -45,10 +58,10 @@ function toast(msg) {
   t.textContent = msg;
   t.hidden = false;
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => { t.hidden = true; }, 2200);
+  toast._t = setTimeout(() => { t.hidden = true; }, 2600);
 }
 
-// ---- 描画 ------------------------------------------------------------------
+// ---- メンバー選択 ----------------------------------------------------------
 function renderMeSelect() {
   const sel = $('#me-select');
   sel.innerHTML = '';
@@ -65,6 +78,7 @@ function renderMeSelect() {
   }
 }
 
+// ---- 週の描画 --------------------------------------------------------------
 async function renderWeek() {
   const monday = addDays(mondayOf(new Date()), weekOffset * 7);
   const saturday = addDays(monday, 5);
@@ -74,103 +88,149 @@ async function renderWeek() {
   const reservations = await api(
     `/api/reservations?from=${ymd(monday)}&to=${ymd(saturday)}`
   );
-  const byDate = new Map(reservations.map((r) => [r.date, r]));
+  const byDate = new Map();
+  for (const r of reservations) {
+    if (!byDate.has(r.date)) byDate.set(r.date, []);
+    byDate.get(r.date).push(r);
+  }
 
   const todayStr = ymd(new Date());
   const grid = $('#week-grid');
   grid.innerHTML = '';
 
-  for (let i = 0; i < 6; i++) {      // 月(0)〜土(5)
+  for (let i = 0; i < 6; i++) {        // 月(0)〜土(5)
     const d = addDays(monday, i);
     const dateStr = ymd(d);
-    const r = byDate.get(dateStr);
+    const list = byDate.get(dateStr) || [];
 
-    const cell = document.createElement('div');
-    cell.className = 'day';
-    if (i === 5) cell.classList.add('sat');
-    if (dateStr === todayStr) cell.classList.add('today');
-    if (dateStr < todayStr) cell.classList.add('past');
+    const card = document.createElement('section');
+    card.className = 'day';
+    if (i === 5) card.classList.add('sat');
+    if (dateStr === todayStr) card.classList.add('today');
+    if (dateStr < todayStr) card.classList.add('past');
 
-    const dow = document.createElement('div');
-    dow.className = 'dow';
-    dow.textContent = DOW[d.getDay()];
+    // 見出し行（曜日・日付・追加ボタン）
+    const head = document.createElement('div');
+    head.className = 'day-head';
+    head.innerHTML =
+      `<span class="dow">${DOW[d.getDay()]}</span>` +
+      `<span class="date">${d.getMonth() + 1}/${d.getDate()}</span>`;
+    const addBtn = document.createElement('button');
+    addBtn.className = 'add';
+    addBtn.textContent = '＋ 追加';
+    addBtn.addEventListener('click', () => openAddDialog(dateStr, d));
+    head.appendChild(addBtn);
+    card.appendChild(head);
 
-    const date = document.createElement('div');
-    date.className = 'date';
-    date.textContent = `${d.getMonth() + 1}/${d.getDate()}`;
-
-    const status = document.createElement('div');
-    status.className = 'status';
-    if (r) {
-      const badge = document.createElement('span');
-      badge.className = 'badge' + (r.user_id === meId ? ' mine' : '');
-      badge.style.background = r.user_color;
-      badge.textContent = r.user_name;
-      status.appendChild(badge);
-      if (r.note) {
-        const note = document.createElement('span');
-        note.className = 'note';
-        note.textContent = r.note;
-        status.appendChild(note);
-      }
+    // 予約ブロック一覧
+    const body = document.createElement('div');
+    body.className = 'day-body';
+    if (list.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = '空き';
+      body.appendChild(empty);
     } else {
-      status.classList.add('empty');
-      status.textContent = '空き';
+      for (const r of list) {
+        const block = document.createElement('div');
+        block.className = 'res' + (r.user_id === meId ? ' mine' : '');
+        block.style.borderLeftColor = r.user_color;
+        const mine = r.user_id === meId;
+        block.innerHTML =
+          `<span class="time">${r.start_time}〜${r.end_time}</span>` +
+          `<span class="who" style="color:${r.user_color}">${r.user_name}</span>` +
+          (r.note ? `<span class="note">${escapeHtml(r.note)}</span>` : '') +
+          (mine ? `<span class="edit">編集 ›</span>` : '');
+        if (mine) block.addEventListener('click', () => openEditDialog(d, r));
+        body.appendChild(block);
+      }
     }
-
-    cell.append(dow, date, status);
-    cell.addEventListener('click', () => onDayClick(dateStr, r));
-    grid.appendChild(cell);
+    card.appendChild(body);
+    grid.appendChild(card);
   }
 }
 
-// ---- 操作 ------------------------------------------------------------------
-async function onDayClick(dateStr, reservation) {
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ---- 予約ダイアログ --------------------------------------------------------
+function fillTimeSelect(sel, slots, selected) {
+  sel.innerHTML = '';
+  for (const t of slots) {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = t;
+    if (t === selected) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+function dialogDateTitle(d) {
+  return `${d.getMonth() + 1}/${d.getDate()}(${DOW[d.getDay()]})`;
+}
+
+function openAddDialog(dateStr, dateObj) {
   if (!meId) return toast('先に「わたしは」を選んでください');
-  if (!reservation) {
-    // 空き → その場で予約
-    try {
-      await api('/api/reservations', {
-        method: 'POST',
-        body: JSON.stringify({ date: dateStr, user_id: meId }),
-      });
-      toast('予約しました');
-    } catch (e) {
-      toast(e.message);
-    }
-    await renderWeek();
-  } else if (reservation.user_id === meId) {
-    // 自分の予約 → メモ編集 / 取消ダイアログ
-    openResDialog(dateStr, reservation);
-  } else {
-    toast(`その日は ${reservation.user_name} さんが予約済みです`);
-  }
-}
-
-// ---- 自分の予約の操作ダイアログ -------------------------------------------
-function openResDialog(dateStr, reservation) {
   const dlg = $('#res-dialog');
-  const [, m, d] = dateStr.split('-');
-  $('#res-title').textContent = `${Number(m)}/${Number(d)} の予約`;
-  const noteInput = $('#res-note');
-  noteInput.value = reservation.note || '';
+  $('#res-title').textContent = `${dialogDateTitle(dateObj)} の予約を追加`;
+  fillTimeSelect($('#res-start'), SLOTS.slice(0, -1), '09:00');   // 開始: 8:00〜21:30
+  fillTimeSelect($('#res-end'), SLOTS.slice(1), '10:00');         // 終了: 8:30〜22:00
+  $('#res-note').value = '';
+  $('#res-delete').hidden = true;
+  $('#res-save').textContent = '予約する';
 
   $('#res-save').onclick = async () => {
     try {
       await api('/api/reservations', {
+        method: 'POST',
+        body: JSON.stringify({
+          date: dateStr,
+          start: $('#res-start').value,
+          end: $('#res-end').value,
+          user_id: meId,
+          note: $('#res-note').value,
+        }),
+      });
+      toast('予約しました');
+      dlg.close();
+      await renderWeek();
+    } catch (e) { toast(e.message); }
+  };
+  dlg.showModal();
+}
+
+function openEditDialog(dateObj, r) {
+  const dlg = $('#res-dialog');
+  $('#res-title').textContent = `${dialogDateTitle(dateObj)} の予約を変更`;
+  fillTimeSelect($('#res-start'), SLOTS.slice(0, -1), r.start_time);
+  fillTimeSelect($('#res-end'), SLOTS.slice(1), r.end_time);
+  $('#res-note').value = r.note || '';
+  $('#res-delete').hidden = false;
+  $('#res-save').textContent = '保存';
+
+  $('#res-save').onclick = async () => {
+    try {
+      await api(`/api/reservations/${r.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ date: dateStr, user_id: meId, note: noteInput.value }),
+        body: JSON.stringify({
+          user_id: meId,
+          start: $('#res-start').value,
+          end: $('#res-end').value,
+          note: $('#res-note').value,
+        }),
       });
       toast('保存しました');
       dlg.close();
       await renderWeek();
     } catch (e) { toast(e.message); }
   };
-  $('#res-cancel').onclick = async () => {
+  $('#res-delete').onclick = async () => {
     try {
-      await api('/api/reservations', {
+      await api(`/api/reservations/${r.id}`, {
         method: 'DELETE',
-        body: JSON.stringify({ date: dateStr, user_id: meId }),
+        body: JSON.stringify({ user_id: meId }),
       });
       toast('予約を取消しました');
       dlg.close();
@@ -209,9 +269,7 @@ function openNamesDialog() {
         renderMeSelect();
         await renderWeek();
         toast('保存しました');
-      } catch (e) {
-        toast(e.message);
-      }
+      } catch (e) { toast(e.message); }
     });
 
     row.append(color, name, save);

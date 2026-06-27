@@ -6,10 +6,10 @@
 ## 特徴
 
 - 週カレンダー（**月〜土**）で全員の予約がひと目で見える
-- 予約の単位は **1日まるごと（曜日単位）**
-- 車は1台なので **1日1人まで**（ダブルブッキングを仕組みで防止）
-- 空いている日をタップ → 自分の名前で予約
-- 自分の予約をタップ → **ひとことメモの編集・取消**（誤タップでの取消も防止）
+- 予約の単位は **時間帯（30分きざみ・8:00〜22:00）**
+- 車は1台なので、**時間が重なる予約はブロック**（同じ日でも時間が違えば複数人OK）
+- 各日の「＋ 追加」から、開始・終了の時刻を選んで予約
+- 自分の予約をタップ → **時間の変更・メモ編集・取消**（編集・取消は本人のみ）
 - データは SQLite（`kurumayoyaku.db`）に保存される本物のDB
 - メンバーの名前・色は画面から変更可能
 
@@ -49,9 +49,12 @@ PORT=8080 DB_PATH=/data/kurumayoyaku.db npm start
 
 1. 画面上部「わたしは」で自分の名前を選ぶ（端末に記憶されます）
 2. 「次の週 ▶」で予約したい週へ移動
-3. 空いている日をタップ → 自分の名前で予約
-4. 自分の予約をタップ → メモの編集・取消（編集・取消できるのは予約した本人だけ）
+3. 予約したい日の「＋ 追加」→ 開始・終了の時刻（30分きざみ）とメモを入れて予約
+4. 自分の予約をタップ → 時間の変更・メモ編集・取消（変更・取消できるのは本人だけ）
 5. 名前や色は「名前を変更」から編集できます
+
+> 予約できる時間帯（8:00〜22:00）は `server.js` の `OPEN` / `CLOSE` と
+> `public/app.js` の `OPEN` / `CLOSE` を合わせて変更できます。
 
 ## データベース仕様
 
@@ -68,10 +71,15 @@ PORT=8080 DB_PATH=/data/kurumayoyaku.db npm start
 | 列 | 型 | 説明 |
 |----|----|----|
 | id | INTEGER | 主キー |
-| date | TEXT | `YYYY-MM-DD`。**UNIQUE**＝1日1件のみ |
+| date | TEXT | `YYYY-MM-DD` |
+| start_time | TEXT | 開始時刻 `HH:MM`（30分きざみ） |
+| end_time | TEXT | 終了時刻 `HH:MM`（開始より後） |
 | user_id | INTEGER | 予約者（users.id） |
 | note | TEXT | メモ（任意） |
 | created_at | TEXT | 作成日時（ISO8601） |
+
+> 車は1台なので、同じ `date` 内で時間帯が重なる予約はサーバ側で拒否されます
+> （重なり判定：`既存.start < 新.end かつ 新.start < 既存.end`）。
 
 ## API
 
@@ -80,9 +88,9 @@ PORT=8080 DB_PATH=/data/kurumayoyaku.db npm start
 | GET | `/api/users` | メンバー一覧 |
 | PATCH | `/api/users/:id` | 名前・色の変更 |
 | GET | `/api/reservations?from=YYYY-MM-DD&to=YYYY-MM-DD` | 期間内の予約一覧 |
-| POST | `/api/reservations` | 予約（`{date, user_id}`）。埋まっていれば409 |
-| PATCH | `/api/reservations` | メモ編集（`{date, user_id, note}`）。本人のみ |
-| DELETE | `/api/reservations` | 取消（`{date, user_id}`）。本人のみ |
+| POST | `/api/reservations` | 予約（`{date, start, end, user_id, note}`）。時間が重なれば409 |
+| PATCH | `/api/reservations/:id` | 時間・メモ変更（`{user_id, start, end, note}`）。本人のみ |
+| DELETE | `/api/reservations/:id` | 取消（`{user_id}`）。本人のみ |
 | GET | `/healthz` | ヘルスチェック（ホスティング用） |
 
 ## 公開（ホスティング）について

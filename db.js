@@ -19,7 +19,9 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS reservations (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    date       TEXT NOT NULL UNIQUE,           -- 'YYYY-MM-DD'。車は1台なので1日1件のみ。
+    date       TEXT NOT NULL,                  -- 'YYYY-MM-DD'
+    start_time TEXT NOT NULL,                  -- 'HH:MM'（30分きざみ）
+    end_time   TEXT NOT NULL,                  -- 'HH:MM'（開始より後）
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     note       TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
@@ -27,6 +29,26 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(date);
 `);
+
+// --- 旧スキーマ（1日まるごと方式）からの移行 -------------------------------
+// 以前の reservations には start_time/end_time が無い。残っていれば作り直す。
+const cols = db.prepare(`PRAGMA table_info(reservations)`).all().map((c) => c.name);
+if (!cols.includes('start_time')) {
+  console.log('旧スキーマを検出したため reservations を作り直します（時間帯対応）');
+  db.exec(`
+    DROP TABLE reservations;
+    CREATE TABLE reservations (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      date       TEXT NOT NULL,
+      start_time TEXT NOT NULL,
+      end_time   TEXT NOT NULL,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      note       TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(date);
+  `);
+}
 
 // --- 初期メンバー（3人） ----------------------------------------------------
 const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;

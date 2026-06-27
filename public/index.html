@@ -25,21 +25,30 @@
 
   <main id="week-grid"></main>
 
-  <p id="hint">空いている日をタップすると<strong>自分の名前で予約</strong>。自分の予約をタップすると<strong>メモ編集・取消</strong>ができます。</p>
+  <p id="hint">各日の「＋ 追加」から、開始・終了の時刻（30分きざみ・8:00〜22:00）を選んで予約します。自分の予約をタップすると時間の変更・取消ができます。</p>
 
   <div id="toast" class="toast" hidden></div>
 
-  <!-- 自分の予約の操作ダイアログ -->
+  <!-- 予約の追加・編集ダイアログ -->
   <dialog id="res-dialog">
     <h2 id="res-title"></h2>
-    <div class="name-row">
-      <input type="text" id="res-note" maxlength="100" placeholder="ひとことメモ（例：通院・買い物）" />
+    <div class="field">
+      <label>開始</label>
+      <select id="res-start"></select>
+    </div>
+    <div class="field">
+      <label>終了</label>
+      <select id="res-end"></select>
+    </div>
+    <div class="field">
+      <label>メモ</label>
+      <input type="text" id="res-note" maxlength="100" placeholder="任意（例：通院・買い物）" />
     </div>
     <menu class="res-menu">
-      <button id="res-cancel" class="danger">予約を取消</button>
+      <button id="res-delete" class="danger" hidden>取消</button>
       <span style="flex:1"></span>
       <button id="res-close">閉じる</button>
-      <button id="res-save" class="primary">保存</button>
+      <button id="res-save" class="primary">予約する</button>
     </menu>
   </dialog>
 
