@@ -17,19 +17,20 @@
 
 | 種類 | 技術 |
 |------|------|
-| サーバ | Node.js + Express |
-| データベース | SQLite（better-sqlite3） |
+| サーバ | Node.js + Express（Vercel のサーバーレス関数として動作） |
+| データベース | Turso（libSQL・SQLite互換）。ローカルでは file: のSQLite |
 | 画面 | HTML / CSS / バニラJS（ビルド不要） |
 
 ```
 kurumayoyaku/
-├─ server.js        … APIサーバ
-├─ db.js            … DB接続・スキーマ・初期メンバー
+├─ api/index.js     … APIサーバ本体（Vercelの関数／ローカルでも共用）
+├─ lib/db.js        … DB接続（Turso/ローカル）・スキーマ・初期メンバー
+├─ server.js        … ローカル開発用の起動スクリプト
 ├─ public/          … 画面（index.html / app.js / style.css）
-└─ kurumayoyaku.db  … データ本体（初回起動時に自動生成・git管理外）
+└─ vercel.json      … Vercel のルーティング設定
 ```
 
-## 起動方法
+## ローカルで動かす
 
 ```bash
 npm install
@@ -37,12 +38,12 @@ npm start
 ```
 
 起動後、ブラウザで http://localhost:3000 を開きます。
-同じネットワーク内のスマホからは `http://<PCのIPアドレス>:3000` でアクセスできます。
+Turso の環境変数が無ければ、自動でローカルのファイルDB（`kurumayoyaku.db`）で動きます。
 
-ポートを変えたい場合・DBファイルの場所を変えたい場合：
+本番（Vercel）と同じ Turso を使いたい場合は、環境変数を設定してから起動します：
 
 ```bash
-PORT=8080 DB_PATH=/data/kurumayoyaku.db npm start
+TURSO_DATABASE_URL=libsql://xxxx.turso.io TURSO_AUTH_TOKEN=xxxxx npm start
 ```
 
 ## 使い方
@@ -95,38 +96,18 @@ PORT=8080 DB_PATH=/data/kurumayoyaku.db npm start
 
 ## 公開（ホスティング）について
 
-3人がそれぞれ外出先のスマホから使うには、どこかに公開すると便利です。
-
-### A. 家のPCで動かす（一番かんたん）
-上記の起動方法のまま、同じWi-Fi内のスマホから `http://<PCのIP>:3000` で使えます。
-外からは使えませんが、設定不要です。
-
-### B. Render にデプロイ（外からも使える・常時稼働）
-このリポジトリには `Dockerfile` と `render.yaml`（Starter プラン＋永続ディスク）を同梱しています。
-**クリックだけで進められる詳しい手順は [DEPLOY.md](./DEPLOY.md) を参照してください。**
+**Vercel ＋ Turso で完全無料で公開できます**（クレカ登録も不要）。
+クリックだけで進められる詳しい手順は **[DEPLOY.md](./DEPLOY.md)** を参照してください。
 
 おおまかな流れ：
 
-1. https://render.com にGitHubでログイン
-2. **New → Blueprint** を選び、このリポジトリ／ブランチを指定
-3. `render.yaml` が読み込まれ、永続ディスク付きで公開されます
+1. **Turso**（https://turso.tech）でデータベースを作り、`Database URL` と `トークン` を控える
+2. **Vercel**（https://vercel.com）にこのリポジトリを Import
+3. 環境変数 `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` を登録して Deploy
 4. 発行されたURLを3人で共有すれば、どの端末からも同じ予約表を使えます
 
-> **データ保持についての注意**：SQLiteのデータを保持する永続ディスクは
-> Render の**有料プラン（Starter・約$7/月〜）**でのみ使えます。`render.yaml` は
-> 既定で `plan: starter` ＋ 永続ディスクにしてあり、再デプロイしてもデータは消えません。
->
-> **まず無料で試したい**場合は `render.yaml` の `disk:` ブロックを削除し
-> `plan: free` に変更してください。ただし無料プランはディスクが無いため、
-> スリープ復帰や再デプロイのたびに**予約データが消えます**（お試し用途のみ）。
-> 無料のまま外からも使い、かつデータを保持したい場合は Fly.io（無料枠＋永続ボリューム）
-> なども選べます。ご希望があれば設定します。
-
-### C. Docker で動かす
-```bash
-docker build -t kurumayoyaku .
-docker run -p 3000:3000 -v $(pwd)/data:/data kurumayoyaku
-```
-
-> 公開する場合、誰でもアクセスできる状態になります。3人だけで使いたい場合は、
-> URLを共有相手だけに渡す運用にするか、簡易パスワードの追加をご相談ください。
+> - データは Turso に保存されるため、再デプロイやスリープ復帰でも**消えません**。
+> - サーバーレスのため、しばらく使わないと一時停止し、次のアクセスで起動します
+>   （初回が数秒遅いことがあります）。
+> - 公開URLを知っていれば誰でもアクセスできます。3人だけに共有する運用が基本です。
+>   「簡易パスワード」を付けたい場合は対応できます。
