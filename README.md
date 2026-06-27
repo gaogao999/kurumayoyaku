@@ -101,11 +101,14 @@ PORT=8080 DB_PATH=/data/kurumayoyaku.db npm start
 上記の起動方法のまま、同じWi-Fi内のスマホから `http://<PCのIP>:3000` で使えます。
 外からは使えませんが、設定不要です。
 
-### B. Render にデプロイ（外からも使える）
-このリポジトリには `Dockerfile` と `render.yaml` を同梱しています。
+### B. Render にデプロイ（外からも使える・常時稼働）
+このリポジトリには `Dockerfile` と `render.yaml`（Starter プラン＋永続ディスク）を同梱しています。
+**クリックだけで進められる詳しい手順は [DEPLOY.md](./DEPLOY.md) を参照してください。**
+
+おおまかな流れ：
 
 1. https://render.com にGitHubでログイン
-2. **New → Blueprint** を選び、このリポジトリを指定
+2. **New → Blueprint** を選び、このリポジトリ／ブランチを指定
 3. `render.yaml` が読み込まれ、永続ディスク付きで公開されます
 4. 発行されたURLを3人で共有すれば、どの端末からも同じ予約表を使えます
 
