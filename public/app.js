@@ -3,16 +3,25 @@
 const DOW = ['日', '月', '火', '水', '木', '金', '土'];
 const OPEN = '08:00';
 const CLOSE = '22:00';
+const START_MIN = 8 * 60;   // 8:00
+const END_MIN = 22 * 60;    // 22:00
+const HOUR_PX = 46;         // 1時間あたりの高さ(px)
+const TOTAL_PX = ((END_MIN - START_MIN) / 60) * HOUR_PX;
 
 // ---- 時刻スロット（8:00〜22:00 を30分きざみ） -----------------------------
 function buildSlots() {
   const slots = [];
-  for (let m = 8 * 60; m <= 22 * 60; m += 30) {
-    const h = String(Math.floor(m / 60)).padStart(2, '0');
-    const mi = String(m % 60).padStart(2, '0');
-    slots.push(`${h}:${mi}`);
-  }
+  for (let m = START_MIN; m <= END_MIN; m += 30) slots.push(minToTime(m));
   return slots; // ['08:00', ..., '22:00']
+}
+function minToTime(m) {
+  const h = String(Math.floor(m / 60)).padStart(2, '0');
+  const mi = String(m % 60).padStart(2, '0');
+  return `${h}:${mi}`;
+}
+function timeToMin(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
 }
 const SLOTS = buildSlots();
 
@@ -78,7 +87,7 @@ function renderMeSelect() {
   }
 }
 
-// ---- 週の描画 --------------------------------------------------------------
+// ---- 週カレンダーの描画（Googleカレンダー風タイムライン） ------------------
 async function renderWeek() {
   const monday = addDays(mondayOf(new Date()), weekOffset * 7);
   const saturday = addDays(monday, 5);
@@ -94,60 +103,94 @@ async function renderWeek() {
     byDate.get(r.date).push(r);
   }
 
-  const todayStr = ymd(new Date());
-  const grid = $('#week-grid');
-  grid.innerHTML = '';
+  const now = new Date();
+  const todayStr = ymd(now);
+  const root = $('#week-grid');
+  root.innerHTML = '';
 
-  for (let i = 0; i < 6; i++) {        // 月(0)〜土(5)
+  // --- 曜日ヘッダー行 ---
+  const head = document.createElement('div');
+  head.className = 'cal-head';
+  head.appendChild(document.createElement('div')); // 時間目盛り用の空白
+  for (let i = 0; i < 6; i++) {
+    const d = addDays(monday, i);
+    const dh = document.createElement('div');
+    dh.className = 'dh' + (ymd(d) === todayStr ? ' today' : '') + (i === 5 ? ' sat' : '');
+    dh.innerHTML = `<span class="d">${DOW[d.getDay()]}</span><span class="n">${d.getMonth() + 1}/${d.getDate()}</span>`;
+    head.appendChild(dh);
+  }
+  root.appendChild(head);
+
+  // --- 本体（時間目盛り＋6列） ---
+  const body = document.createElement('div');
+  body.className = 'cal-body';
+
+  // 時間目盛り列
+  const gutter = document.createElement('div');
+  gutter.className = 'gutter';
+  gutter.style.height = TOTAL_PX + 'px';
+  for (let m = START_MIN; m <= END_MIN; m += 60) {
+    const hr = document.createElement('div');
+    hr.className = 'hr';
+    hr.style.top = ((m - START_MIN) / 60) * HOUR_PX + 'px';
+    hr.textContent = minToTime(m);
+    gutter.appendChild(hr);
+  }
+  body.appendChild(gutter);
+
+  // 各曜日の列
+  for (let i = 0; i < 6; i++) {
     const d = addDays(monday, i);
     const dateStr = ymd(d);
-    const list = byDate.get(dateStr) || [];
+    const col = document.createElement('div');
+    col.className = 'col' + (dateStr === todayStr ? ' today' : '');
+    col.style.height = TOTAL_PX + 'px';
 
-    const card = document.createElement('section');
-    card.className = 'day';
-    if (i === 5) card.classList.add('sat');
-    if (dateStr === todayStr) card.classList.add('today');
-    if (dateStr < todayStr) card.classList.add('past');
+    // 空き部分のタップで「その時間から」予約追加
+    col.addEventListener('click', (e) => {
+      if (e.target.closest('.ev')) return;       // ブロックのタップは無視
+      const rect = col.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      let m = START_MIN + Math.floor((y / HOUR_PX) * 60 / 30) * 30;
+      m = Math.max(START_MIN, Math.min(END_MIN - 30, m));
+      openAddDialog(dateStr, d, minToTime(m));
+    });
 
-    // 見出し行（曜日・日付・追加ボタン）
-    const head = document.createElement('div');
-    head.className = 'day-head';
-    head.innerHTML =
-      `<span class="dow">${DOW[d.getDay()]}</span>` +
-      `<span class="date">${d.getMonth() + 1}/${d.getDate()}</span>`;
-    const addBtn = document.createElement('button');
-    addBtn.className = 'add';
-    addBtn.textContent = '＋ 追加';
-    addBtn.addEventListener('click', () => openAddDialog(dateStr, d));
-    head.appendChild(addBtn);
-    card.appendChild(head);
+    // 予約ブロック
+    for (const r of (byDate.get(dateStr) || [])) {
+      const s = timeToMin(r.start_time);
+      const en = timeToMin(r.end_time);
+      const ev = document.createElement('div');
+      ev.className = 'ev' + (r.user_id === meId ? ' mine' : '');
+      ev.style.top = ((s - START_MIN) / 60) * HOUR_PX + 'px';
+      ev.style.height = Math.max(((en - s) / 60) * HOUR_PX - 2, 16) + 'px';
+      ev.style.background = r.user_color;
+      ev.innerHTML =
+        `<span class="en">${escapeHtml(r.user_name)}</span>` +
+        `<span class="et">${r.start_time}〜${r.end_time}</span>` +
+        (r.note ? `<span class="eo">${escapeHtml(r.note)}</span>` : '');
+      ev.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (r.user_id === meId) openEditDialog(d, r);
+        else toast(`${r.user_name} さんが予約済みです（${r.start_time}〜${r.end_time}）`);
+      });
+      col.appendChild(ev);
+    }
 
-    // 予約ブロック一覧
-    const body = document.createElement('div');
-    body.className = 'day-body';
-    if (list.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'empty';
-      empty.textContent = '空き';
-      body.appendChild(empty);
-    } else {
-      for (const r of list) {
-        const block = document.createElement('div');
-        block.className = 'res' + (r.user_id === meId ? ' mine' : '');
-        block.style.borderLeftColor = r.user_color;
-        const mine = r.user_id === meId;
-        block.innerHTML =
-          `<span class="time">${r.start_time}〜${r.end_time}</span>` +
-          `<span class="who" style="color:${r.user_color}">${r.user_name}</span>` +
-          (r.note ? `<span class="note">${escapeHtml(r.note)}</span>` : '') +
-          (mine ? `<span class="edit">編集 ›</span>` : '');
-        if (mine) block.addEventListener('click', () => openEditDialog(d, r));
-        body.appendChild(block);
+    // 「今」を示す赤い線（今週・今日・営業時間内のみ）
+    if (dateStr === todayStr) {
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      if (nowMin >= START_MIN && nowMin <= END_MIN) {
+        const line = document.createElement('div');
+        line.className = 'nowline';
+        line.style.top = ((nowMin - START_MIN) / 60) * HOUR_PX + 'px';
+        col.appendChild(line);
       }
     }
-    card.appendChild(body);
-    grid.appendChild(card);
+
+    body.appendChild(col);
   }
+  root.appendChild(body);
 }
 
 function escapeHtml(s) {
@@ -171,12 +214,16 @@ function dialogDateTitle(d) {
   return `${d.getMonth() + 1}/${d.getDate()}(${DOW[d.getDay()]})`;
 }
 
-function openAddDialog(dateStr, dateObj) {
+function openAddDialog(dateStr, dateObj, startPref) {
   if (!meId) return toast('先に「わたしは」を選んでください');
   const dlg = $('#res-dialog');
   $('#res-title').textContent = `${dialogDateTitle(dateObj)} の予約を追加`;
-  fillTimeSelect($('#res-start'), SLOTS.slice(0, -1), '09:00');   // 開始: 8:00〜21:30
-  fillTimeSelect($('#res-end'), SLOTS.slice(1), '10:00');         // 終了: 8:30〜22:00
+
+  const start = startPref && SLOTS.includes(startPref) ? startPref : '09:00';
+  // 終了の初期値は開始の1時間後（範囲内に収める）
+  let endDefault = minToTime(Math.min(timeToMin(start) + 60, END_MIN));
+  fillTimeSelect($('#res-start'), SLOTS.slice(0, -1), start);
+  fillTimeSelect($('#res-end'), SLOTS.slice(1), endDefault);
   $('#res-note').value = '';
   $('#res-delete').hidden = true;
   $('#res-save').textContent = '予約する';
